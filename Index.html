@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Conecta - Auditoria de Acessos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f5f5f4; }
+    .bg-agro-pattern { background-image: radial-gradient(#d6d3d1 1px, transparent 1px); background-size: 24px 24px; }
+    
+    .btn-sim-ativo { background-color: #059669 !important; color: white !important; border-color: #059669 !important; box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.2); }
+    .btn-nao-ativo { background-color: #dc2626 !important; color: white !important; border-color: #dc2626 !important; box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.2); }
+    
+    .chip-mod-selecionado { background-color: #ecfdf5; color: #047857; border-color: #34d399; }
+    .chip-mod-desligado { background-color: #f5f5f4; color: #a8a29e; border-color: #e7e5e4; }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen text-slate-800">
+
+  <!-- AVISOS TOAST -->
+  <div id="toastNotificacao" class="fixed top-6 right-6 z-[70] transform translate-x-[120%] transition-transform duration-300 ease-out max-w-sm w-full bg-white shadow-xl rounded-xl border p-4 flex items-start gap-3 hidden">
+    <div id="toast-icon" class="w-10 h-10 rounded-full flex items-center justify-center shrink-0"></div>
+    <div class="flex-1 pt-0.5 w-full overflow-hidden">
+      <h4 id="toast-title" class="font-bold text-sm text-slate-900 truncate"></h4>
+      <p id="toast-message" class="text-xs text-slate-500 mt-1 leading-relaxed break-words"></p>
+    </div>
+    <button onclick="ocultarNotificacao()" class="text-slate-400 hover:text-slate-700 transition-colors shrink-0"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+
+  <!-- MODAL ADMIN -->
+  <div id="modal-admin" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-lg w-full p-6 relative overflow-hidden transform scale-95 transition-all duration-200">
+      <div class="flex justify-between items-center border-b border-stone-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-base">
+          <i class="fa-solid fa-shield-halved text-indigo-700"></i> Gestão de Acessos - Administrador
+        </h3>
+        <button onclick="fecharModal('modal-admin')" class="text-stone-400 hover:text-stone-600 cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="mb-3 flex flex-col md:flex-row justify-between items-start md:items-center bg-stone-50 p-3 rounded-lg border border-stone-200 gap-3">
+        <div class="text-[11px] text-stone-500 leading-tight"><i class="fa-solid fa-circle-info text-indigo-500"></i> Códigos de 6 dígitos gerados p/ novos gestores.</div>
+        <button onclick="acionarCargaAdmin()" class="text-indigo-600 hover:text-indigo-800 text-xs font-bold cursor-pointer transition-colors w-full md:w-auto text-center"><i class="fa-solid fa-rotate-right"></i> Recarregar</button>
+      </div>
+      <div id="lista-admin-chaves" class="max-h-80 overflow-y-auto space-y-2 pr-1"></div>
+      <div class="mt-5 flex justify-end">
+        <button onclick="fecharModal('modal-admin')" class="w-full md:w-auto bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-xl text-xs cursor-pointer transition-colors">Fechar Painel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CONFIRMAÇÃO RETIRADA -->
+  <div id="modal-confirmacao" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[60] flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-sm w-full p-6 relative overflow-hidden transform scale-95 transition-all duration-200">
+      <div class="text-center mb-5">
+        <div class="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl"><i class="fa-solid fa-trash-can"></i></div>
+        <h3 class="font-bold text-slate-800 text-lg">Retirar Registro?</h3>
+        <p class="text-sm text-stone-500 mt-2">Remover <b id="nomeRemocaoTexto" class="text-slate-700 break-words"></b> do lote financeiro atual?</p>
+      </div>
+      <div class="flex flex-col md:flex-row gap-3 w-full">
+        <button onclick="fecharModal('modal-confirmacao')" class="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold py-2.5 rounded-xl text-sm transition-colors cursor-pointer">Cancelar</button>
+        <button onclick="confirmarExclusaoLog()" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors shadow-md cursor-pointer">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL HISTÓRICO -->
+  <div id="modal-historico" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-md w-full p-6 relative overflow-hidden transform scale-95 transition-all duration-200">
+      <div class="flex justify-between items-center border-b border-stone-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-base">
+          <i class="fa-solid fa-clock-rotate-left text-emerald-700"></i> Aprovados (Última Versão)
+        </h3>
+        <button onclick="fecharModal('modal-historico')" class="text-stone-400 hover:text-stone-600 cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="lista-historico-lote" class="max-h-60 overflow-y-auto space-y-2 pr-1 text-sm text-stone-600"></div>
+    </div>
+  </div>
+
+  <!-- MODAL CUSTO -->
+  <div id="modal-custo" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-xs w-full p-6 relative overflow-hidden transform scale-95 transition-all duration-200">
+      <div class="flex justify-between items-center border-b border-stone-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-base">
+          <i class="fa-solid fa-gear text-emerald-700"></i> Parâmetros Financeiros
+        </h3>
+        <button onclick="fecharModal('modal-custo')" class="text-stone-400 hover:text-stone-600 cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-stone-600 uppercase mb-1">Custo Un. (USD):</label>
+          <input type="number" id="valorCustoBase" value="7500" class="w-full bg-stone-50 border border-stone-300 p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 outline-none font-bold text-emerald-800">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-stone-600 uppercase mb-1">Câmbio Dólar (BRL):</label>
+          <input type="number" id="valorCambioBase" value="5.00" step="0.01" class="w-full bg-stone-50 border border-stone-300 p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 outline-none font-bold text-stone-700">
+        </div>
+      </div>
+      <div class="mt-6">
+        <button onclick="gravarNovosParametros()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2.5 rounded-xl text-xs cursor-pointer transition-colors">Sincronizar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ATUALIZAR CHAVE -->
+  <div id="modal-senha" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-sm w-full p-6 relative overflow-hidden transform scale-95 transition-all duration-200">
+      <div class="flex justify-between items-center border-b border-stone-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-base">
+          <i class="fa-solid fa-key text-emerald-700"></i> Modificar Chave de Acesso
+        </h3>
+        <button onclick="fecharModal('modal-senha')" class="text-stone-400 hover:text-stone-600 cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-stone-600 uppercase mb-1">Identificação (nome.sobrenome):</label>
+          <input type="text" id="campoChaveUser" class="w-full bg-stone-50 border border-stone-300 p-2.5 rounded-xl text-sm focus:outline-none font-medium">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-stone-600 uppercase mb-1">Chave Atual (ou PIN de 6 dígitos):</label>
+          <input type="text" id="campoChaveAtual" style="-webkit-text-security: disc;" class="w-full bg-stone-50 border border-stone-300 p-2.5 rounded-xl text-sm focus:outline-none font-medium">
+        </div>
+        <div class="border-t border-stone-100 pt-3 mt-1">
+          <label class="block text-xs font-bold text-stone-600 uppercase mb-1">Nova Chave Desejada:</label>
+          <input type="text" id="campoNovaChave" style="-webkit-text-security: disc;" class="w-full bg-stone-50 border border-stone-300 p-2.5 rounded-xl text-sm focus:outline-none font-medium">
+        </div>
+      </div>
+      <div class="mt-6 flex flex-col md:flex-row justify-end gap-2">
+        <button onclick="fecharModal('modal-senha')" class="w-full md:w-auto bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-xl text-xs cursor-pointer">Cancelar</button>
+        <button onclick="solicitarModificacaoChave()" id="btnRegistrarModificacao" class="w-full md:w-auto bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer">Gravar Modificação</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TELA DE CONEXÃO -->
+  <div id="painel-conexao" class="flex-1 flex flex-col items-center justify-center px-4 py-12 bg-agro-pattern">
+    <div class="bg-white rounded-2xl shadow-2xl border border-stone-200 p-6 md:p-8 max-w-md w-full relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-full h-1.5 bg-emerald-700"></div>
+      
+      <div class="flex items-center justify-center gap-4 md:gap-6 mb-6 mt-2">
+        <img src="https://lh3.googleusercontent.com/d/1n52HhQoLoaAaaPcP1CzZfwIhE6hGPQFr" alt="Oracle EPM Cloud" class="h-10 md:h-16 w-auto object-contain">
+        <div class="h-12 md:h-16 w-px bg-stone-300"></div>
+        <img src="https://lh3.googleusercontent.com/d/19ZugNG6eou8bI1rdD3r7zplj0AM80vHB" alt="Grupo Pluma" class="h-10 md:h-16 w-auto object-contain opacity-90">
+      </div>
+
+      <div class="text-center mb-6">
+        <h2 class="text-lg md:text-xl font-bold tracking-tight text-slate-900">Portal Conecta</h2>
+        <p class="text-xs text-stone-500 mt-1">Gestão de Licenciamento Operacional</p>
+      </div>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-[11px] font-bold text-stone-600 uppercase tracking-wider mb-1.5">Identificador Setorial</label>
+          <div class="relative">
+            <i class="fa-regular fa-user absolute left-4 top-1/2 transform -translate-y-1/2 text-stone-400"></i>
+            <input type="text" id="campoIdentificador" placeholder="Ex: fulano.silva" class="w-full bg-stone-50 border border-stone-300 pl-11 pr-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 outline-none transition-all font-medium">
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-stone-600 uppercase tracking-wider mb-1.5">Código de Acesso</label>
+          <div class="relative">
+            <i class="fa-solid fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-stone-400"></i>
+            <input type="text" id="campoChave" placeholder="••••••••" style="-webkit-text-security: disc;" class="w-full bg-stone-50 border border-stone-300 pl-11 pr-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 outline-none transition-all font-medium">
+          </div>
+        </div>
+        
+        <button onclick="sincronizarAcessoGestor()" id="btnValidarAcesso" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer">
+          Estabelecer Conexão <i class="fa-solid fa-chevron-right"></i>
+        </button>
+
+        <div class="text-center mt-3">
+          <button onclick="abrirModal('modal-senha')" class="text-[11px] text-stone-500 hover:text-emerald-700 font-bold underline cursor-pointer">
+            Primeiro acesso ou deseja personalizar o PIN?
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TELA PRINCIPAL DO SISTEMA -->
+  <div id="painel-interno" class="hidden w-full max-w-5xl mx-auto px-4 pt-6 md:pt-10 pb-6 flex-1">
+    
+    <!-- HEADER -->
+    <div class="bg-white rounded-2xl shadow-sm border border-stone-200 p-4 md:p-6 mb-6 flex flex-col md:flex-row justify-between items-center relative overflow-hidden gap-4 md:gap-0">
+      <div class="absolute left-0 top-0 bottom-0 w-2 bg-emerald-700"></div>
+      
+      <div class="pl-2 w-full text-center md:text-left">
+        <!-- ÁREA DE BOAS VINDAS -->
+        <p class="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-1 break-words">
+          BEM-VINDO, <span id="labelNomeLogado" class="text-emerald-700 whitespace-normal"></span>
+        </p>
+        
+        <h1 class="text-lg md:text-2xl font-bold text-slate-800">
+          Validação de Licenças - EPM | PBCS
+        </h1>
+        
+        <div class="mt-3 text-xs md:text-sm font-medium text-stone-600 flex items-center justify-center md:justify-start gap-1 md:gap-2 flex-wrap bg-stone-50 inline-flex p-2 rounded-lg border border-stone-100 w-full md:w-auto">
+          <span>Apurado:</span>
+          <span class="font-bold text-slate-800">USD <span id="labelTotalUSD">0.00</span></span>
+          <span class="text-stone-300">|</span>
+          <span class="font-bold text-emerald-700">~ BRL <span id="labelTotalBRL">0.00</span></span>
+          <button onclick="abrirModal('modal-custo')" class="text-stone-400 hover:text-emerald-600 transition-colors cursor-pointer ml-1" title="Ajustar Custo"><i class="fa-solid fa-gear"></i></button>
+        </div>
+      </div>
+
+      <!-- BANNER LOGOS -->
+      <div class="flex items-center justify-center md:justify-end gap-4 md:gap-8 w-full md:w-auto shrink-0 mt-2 md:mt-0 bg-stone-50 md:bg-transparent p-3 md:p-0 rounded-xl md:rounded-none border border-stone-100 md:border-transparent">
+        <img src="https://lh3.googleusercontent.com/d/1n52HhQoLoaAaaPcP1CzZfwIhE6hGPQFr" alt="Oracle" class="h-10 md:h-16 w-auto object-contain">
+        <div class="h-8 md:h-16 w-px bg-stone-300"></div>
+        <img src="https://lh3.googleusercontent.com/d/19ZugNG6eou8bI1rdD3r7zplj0AM80vHB" alt="Pluma" class="h-10 md:h-16 w-auto object-contain opacity-90">
+      </div>
+    </div>
+
+    <!-- CONTROLES E FILTROS -->
+    <div class="bg-white rounded-2xl shadow-sm border border-stone-200 p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      <div class="w-full">
+        <label class="block text-[10px] font-bold text-emerald-800 uppercase tracking-widest mb-1 opacity-70">Buscar Colaborador:</label>
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-stone-400 text-xs"></i>
+          <input type="text" id="filtroNomeFunc" onkeyup="renderizarInterface()" placeholder="Digite um nome..." class="w-full bg-stone-50 border border-stone-200 text-slate-800 text-sm font-bold pl-8 py-2 pr-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-shadow">
+        </div>
+      </div>
+
+      <div class="w-full">
+        <label class="block text-[10px] font-bold text-emerald-800 uppercase tracking-widest mb-1 opacity-70">Filtrar Categoria:</label>
+        <select id="filtroModulos" onchange="renderizarInterface()" class="w-full bg-stone-50 border border-stone-200 text-slate-800 text-sm font-bold p-2 rounded-xl focus:outline-none cursor-pointer">
+          <option value="todos">Toda a Equipe</option>
+          <option value="fabrica">Módulo: Fab. Ração</option>
+          <option value="ovos">Módulo: Ovos Férteis</option>
+          <option value="pintos">Módulo: Pintos</option>
+          <option value="frango">Módulo: Frango de Corte</option>
+          <option value="orcamento">Módulo: Gastos Fixos</option>
+          <option value="comercial">Módulo: Receitas</option>
+        </select>
+      </div>
+      
+      <div class="w-full">
+        <label class="block text-[10px] font-bold text-emerald-800 uppercase tracking-widest mb-1 opacity-70">Logado como / Visão:</label>
+        <select id="seletorVisaoAlvo" onchange="acionarTrocaVisao()" class="w-full bg-stone-50 border border-stone-200 text-slate-800 text-sm font-bold p-2 rounded-xl focus:outline-none cursor-pointer">
+        </select>
+      </div>
+
+      <!-- ÁREA DE BOTÕES DE AÇÃO -->
+      <div class="w-full flex flex-wrap gap-2 justify-end">
+        <button id="btnPainelAdmin" onclick="abrirModal('modal-admin'); acionarCargaAdmin();" class="hidden flex-1 md:flex-none justify-center items-center gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-sm cursor-pointer">
+          <i class="fa-solid fa-shield-halved"></i> Mod. ADM
+        </button>
+        
+        <button onclick="abrirModal('modal-historico')" id="btnAcessoLoteAnterior" class="hidden flex-1 md:flex-none justify-center items-center gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-sm cursor-pointer">
+          <i class="fa-solid fa-list-check"></i> Auditoria
+        </button>
+        <button onclick="encerrarSessaoAcesso()" class="flex-1 md:flex-none justify-center items-center gap-2 bg-red-50 text-red-700 hover:text-white hover:bg-red-600 border border-red-200 text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-sm cursor-pointer">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Sair
+        </button>
+      </div>
+    </div>
+
+    <!-- LISTA PRINCIPAL -->
+    <div class="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden mb-8 flex flex-col">
+      <div id="container-registros" class="divide-y divide-stone-100"></div>
+      <div id="bloco-gravacao" class="p-5 bg-stone-50 border-t border-stone-200 flex justify-end hidden">
+        <button onclick="processarEnvioLote()" id="btnGravarMatriz" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-8 py-3.5 rounded-xl shadow-md transition-all flex items-center gap-2 w-full md:w-auto justify-center cursor-pointer">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Registrar Validação Lote
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="w-full bg-transparent py-5 text-center mt-auto">
+    <p class="text-xs text-stone-500 font-medium"><span class="font-bold text-emerald-800">Desenvolvido por</span> Coordenação de Custos e Planejamento Orçamentário - <span class="font-bold text-emerald-800">Programa Conecta</span></p>
+    <p class="text-[10px] text-stone-500 mt-1 font-bold tracking-wide">Dúvidas? Tratar com Kássio Cezar via Teams.</p>
+  </footer>
+
+  <script>
+    let dadosBaseOficiais = [];
+    let recorteGestorVisao = [];
+    let sessaoSincronizada = null;
+    let indiceCustoMatriz = 7500.00;
+    let cotacaoReferencia = 5.00;
+    let alvoRemocaoTemporario = null;
+
+    window.onload = function() { 
+      resetarElementoLogin(); 
+      let savedUSD = localStorage.getItem('conectaCustoUSD');
+      let savedBRL = localStorage.getItem('conectaCambioBRL');
+      if(savedUSD) {
+        indiceCustoMatriz = parseFloat(savedUSD);
+        document.getElementById('valorCustoBase').value = indiceCustoMatriz;
+      }
+      if(savedBRL) {
+        cotacaoReferencia = parseFloat(savedBRL);
+        document.getElementById('valorCambioBase').value = cotacaoReferencia;
+      }
+    };
+
+    function resetarElementoLogin() {
+      const btn = document.getElementById('btnValidarAcesso');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `Estabelecer Conexão <i class="fa-solid fa-chevron-right"></i>`;
+      }
+    }
+
+    function formatarPadraoFinanceiro(valor) { return valor.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+    function apurarValoresLote() {
+      let qtdAprovados = recorteGestorVisao.filter(f => f.decisao === 'SIM').length;
+      let vrUSD = qtdAprovados * indiceCustoMatriz;
+      let vrBRL = vrUSD * cotacaoReferencia;
+      
+      document.getElementById('labelTotalUSD').innerText = formatarPadraoFinanceiro(vrUSD);
+      document.getElementById('labelTotalBRL').innerText = formatarPadraoFinanceiro(vrBRL);
+    }
+
+    function gravarNovosParametros() {
+      const nvUSD = parseFloat(document.getElementById('valorCustoBase').value);
+      const nvBRL = parseFloat(document.getElementById('valorCambioBase').value);
+      
+      if(!isNaN(nvUSD) && nvUSD >= 0 && !isNaN(nvBRL) && nvBRL >= 0) {
+        indiceCustoMatriz = nvUSD;
+        cotacaoReferencia = nvBRL;
+        
+        localStorage.setItem('conectaCustoUSD', nvUSD);
+        localStorage.setItem('conectaCambioBRL', nvBRL);
+
+        apurarValoresLote();
+        fecharModal('modal-custo');
+        exibirNotificacaoToast('Tabela Atualizada', `O painel utilizará os novos índices salvos na sua memória.`, 'sucesso');
+      } else {
+        exibirNotificacaoToast('Erro de Formato', 'Utilize apenas números.', 'erro');
+      }
+    }
+
+    function sincronizarAcessoGestor() {
+      const idc = document.getElementById('campoIdentificador').value;
+      const pwd = document.getElementById('campoChave').value;
+      const btn = document.getElementById('btnValidarAcesso');
+      if(!idc || !pwd) return;
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> Autenticando...`;
+
+      google.script.run
+        .withSuccessHandler(function(resposta) {
+          if(resposta.sucesso) {
+            sessaoSincronizada = resposta;
+            document.getElementById('painel-conexao').classList.add('hidden');
+            document.getElementById('painel-interno').classList.remove('hidden');
+            document.body.classList.remove('bg-agro-pattern');
+            document.getElementById('labelNomeLogado').innerText = resposta.gestorAlvo;
+            solicitarCargaMatriz();
+            resetarElementoLogin();
+          } else {
+            exibirNotificacaoToast('Restrição de Acesso', resposta.mensagem, 'erro');
+            resetarElementoLogin();
+          }
+        })
+        .withFailureHandler(acionarAlertaFalha)
+        .validarEntrada(idc, pwd);
+    }
+
+    document.getElementById('campoChave').addEventListener('keypress', function (e) { if (e.key === 'Enter') sincronizarAcessoGestor(); });
+
+    function encerrarSessaoAcesso() {
+      sessaoSincronizada = null;
+      recorteGestorVisao = [];
+      document.getElementById('campoIdentificador').value = '';
+      document.getElementById('campoChave').value = '';
+      document.getElementById('labelTotalUSD').innerText = '0.00';
+      document.getElementById('labelTotalBRL').innerText = '0.00';
+      document.getElementById('labelNomeLogado').innerText = '';
+      document.getElementById('painel-interno').classList.add('hidden');
+      document.getElementById('painel-conexao').classList.remove('hidden');
+      document.body.classList.add('bg-agro-pattern');
+      resetarElementoLogin();
+    }
+
+    function solicitarCargaMatriz() {
+      const pnl = document.getElementById('container-registros');
+      pnl.innerHTML = `<div class="p-8 text-center text-stone-400 animate-pulse">Sincronizando infraestrutura base...</div>`;
+      google.script.run
+        .withSuccessHandler(function(listaServidor) {
+          dadosBaseOficiais = listaServidor;
+          configurarVisaoPainel();
+        })
+        .withFailureHandler(acionarAlertaFalha)
+        .buscarListaDadosPlanilha();
+    }
+
+    function configurarVisaoPainel() {
+      const seletor = document.getElementById('seletorVisaoAlvo');
+      const btnAdmin = document.getElementById('btnPainelAdmin');
+      
+      if(sessaoSincronizada.papel === 'admin') {
+        const aglomerado = [...new Set(dadosBaseOficiais.map(item => item.sup2))].sort();
+        seletor.innerHTML = '<option value="">▼ Visão Master (Selecionar Lote)</option>';
+        aglomerado.forEach(g => seletor.innerHTML += `<option value="${g}">${g}</option>`);
+        seletor.disabled = false;
+        if(btnAdmin) btnAdmin.classList.remove('hidden');
+      } else {
+        seletor.innerHTML = `<option value="${sessaoSincronizada.gestorAlvo}">🔒 Restrito: ${sessaoSincronizada.gestorAlvo}</option>`;
+        seletor.disabled = true;
+        if(btnAdmin) btnAdmin.classList.add('hidden');
+      }
+      acionarTrocaVisao();
+    }
+
+    function acionarTrocaVisao() {
+      const escopo = document.getElementById('seletorVisaoAlvo').value;
+      if(!escopo) { recorteGestorVisao = []; } else {
+        recorteGestorVisao = dadosBaseOficiais.filter(i => i.sup2 === escopo);
+        mapearRegistrosPassados(escopo);
+      }
+      apurarValoresLote();
+      renderizarInterface();
+    }
+
+    function alternarChaveModulo(idx, tipoModulo) { recorteGestorVisao[idx].selecionados[tipoModulo] = !recorteGestorVisao[idx].selecionados[tipoModulo]; renderizarInterface(); }
+    function preencherModulosLote(idx, forcarBoolean) { const ref = recorteGestorVisao[idx].selecionados; for(let key in ref) { ref[key] = forcarBoolean; } renderizarInterface(); }
+    function definirAlocacaoUsuario(idx, escolha) { recorteGestorVisao[idx].decisao = escolha; apurarValoresLote(); renderizarInterface(); }
+
+    function renderizarInterface() {
+      const wrapper = document.getElementById('container-registros');
+      const blocoAcao = document.getElementById('bloco-gravacao');
+      const paramCat = document.getElementById('filtroModulos').value;
+      const paramBusca = document.getElementById('filtroNomeFunc').value.toLowerCase();
+      
+      wrapper.innerHTML = '';
+
+      if(recorteGestorVisao.length === 0) {
+        wrapper.innerHTML = `<div class="p-10 text-center text-stone-400 text-sm">Nenhum vínculo subordinado localizado para este perfil.</div>`;
+        blocoAcao.classList.add('hidden'); return;
+      }
+
+      let injetarLista = recorteGestorVisao.map((obj, iOriginal) => ({ obj, iOriginal }));
+      
+      if(paramCat !== 'todos') injetarLista = injetarLista.filter(map => map.obj.modulosBase[paramCat] === true);
+      if(paramBusca) injetarLista = injetarLista.filter(map => map.obj.nome.toLowerCase().includes(paramBusca) || map.obj.usuario.toLowerCase().includes(paramBusca));
+
+      if(injetarLista.length === 0) {
+        wrapper.innerHTML = `<div class="p-10 text-center text-stone-400 text-sm">Nenhum registro confere com os filtros atuais.</div>`;
+        blocoAcao.classList.remove('hidden'); return;
+      }
+
+      blocoAcao.classList.remove('hidden');
+
+      injetarLista.forEach(itemArray => {
+        const func = itemArray.obj, i = itemArray.iOriginal, s = func.selecionados;
+        const cFab = s.fabrica ? 'chip-mod-selecionado' : 'chip-mod-desligado';
+        const cOvos = s.ovos ? 'chip-mod-selecionado' : 'chip-mod-desligado';
+        const cPintos = s.pintos ? 'chip-mod-selecionado' : 'chip-mod-desligado';
+        const cFrango = s.frango ? 'chip-mod-selecionado' : 'chip-mod-desligado';
+        const cOrc = s.orcamento ? 'chip-mod-selecionado' : 'chip-mod-desligado';
+        const cCom = s.comercial ? 'chip-mod-selecionado' : 'chip-mod-desligado';
+
+        const layoutItem = `
+          <div class="p-4 md:p-5 hover:bg-stone-50 transition-colors border-l-4 ${func.decisao === 'SIM' ? 'border-l-emerald-500 bg-emerald-50/20' : 'border-l-transparent'}">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-3">
+              <div class="w-full md:w-auto">
+                <div class="flex flex-wrap items-center gap-2 md:gap-3 mb-1">
+                  <h3 class="font-bold text-slate-800 text-sm md:text-base break-words">
+                    ${func.nome}
+                  </h3>
+                  <span class="text-[9px] md:text-[10.5px] font-medium text-stone-500 bg-stone-100 px-2 py-0.5 rounded border border-stone-200 inline-flex items-center gap-1.5 w-fit">
+                    <i class="fa-solid fa-sitemap text-stone-400"></i> <span class="truncate max-w-[100px] md:max-w-none">${func.sup1}</span> <i class="fa-solid fa-arrow-right text-stone-300 text-[9px]"></i> <span class="truncate max-w-[100px] md:max-w-none">${func.sup2}</span>
+                  </span>
+                </div>
+              </div>
+              <div class="flex items-center justify-center gap-2 w-full md:w-auto bg-stone-100 p-1.5 rounded-xl border border-stone-200">
+                <button onclick="definirAlocacaoUsuario(${i}, 'SIM')" class="${func.decisao === 'SIM' ? 'btn-sim-ativo' : 'text-stone-500 hover:bg-white border-transparent'} flex-1 md:flex-none md:w-16 py-2 md:py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer">SIM</button>
+                <button onclick="definirAlocacaoUsuario(${i}, 'NÃO')" class="${func.decisao === 'NÃO' ? 'btn-nao-ativo' : 'text-stone-500 hover:bg-white border-transparent'} flex-1 md:flex-none md:w-16 py-2 md:py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer">NÃO</button>
+              </div>
+            </div>
+            <div class="pl-0 md:pl-2">
+              <div class="flex items-center gap-3 mb-2 mt-3 md:mt-0">
+                <span class="text-[9px] md:text-[10px] font-bold text-stone-400 uppercase tracking-wider">Combinação de Acesso:</span>
+                <button onclick="preencherModulosLote(${i}, true)" class="text-[9px] md:text-[10px] font-bold text-emerald-600 hover:underline cursor-pointer">Gabaritar Todos</button>
+                <button onclick="preencherModulosLote(${i}, false)" class="text-[9px] md:text-[10px] font-bold text-red-600 hover:underline cursor-pointer">Limpar Regras</button>
+              </div>
+              <div class="flex flex-wrap gap-1.5 md:gap-2">
+                <button onclick="alternarChaveModulo(${i}, 'fabrica')" class="px-2.5 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold border transition-colors cursor-pointer shadow-sm ${cFab}">Fab. Ração</button>
+                <button onclick="alternarChaveModulo(${i}, 'ovos')" class="px-2.5 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold border transition-colors cursor-pointer shadow-sm ${cOvos}">Ovos Férteis</button>
+                <button onclick="alternarChaveModulo(${i}, 'pintos')" class="px-2.5 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold border transition-colors cursor-pointer shadow-sm ${cPintos}">Pintos</button>
+                <button onclick="alternarChaveModulo(${i}, 'frango')" class="px-2.5 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold border transition-colors cursor-pointer shadow-sm ${cFrango}">Frango de Corte</button>
+                <button onclick="alternarChaveModulo(${i}, 'orcamento')" class="px-2.5 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold border transition-colors cursor-pointer shadow-sm ${cOrc}">Gastos Fixos</button>
+                <button onclick="alternarChaveModulo(${i}, 'comercial')" class="px-2.5 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold border transition-colors cursor-pointer shadow-sm ${cCom}">Receitas</button>
+              </div>
+            </div>
+          </div>
+        `;
+        wrapper.insertAdjacentHTML('beforeend', layoutItem);
+      });
+    }
+
+    function mapearRegistrosPassados(gAlvo) {
+      const btnExt = document.getElementById('btnAcessoLoteAnterior');
+      const painelRef = document.getElementById('lista-historico-lote');
+      google.script.run
+        .withSuccessHandler(function(listaAnt) {
+          if(listaAnt && listaAnt.length > 0) {
+            btnExt.classList.remove('hidden');
+            
+            recorteGestorVisao.forEach(funcItem => {
+               funcItem.decisao = listaAnt.includes(funcItem.nome) ? 'SIM' : 'NÃO';
+            });
+            apurarValoresLote();
+            renderizarInterface();
+
+            painelRef.innerHTML = listaAnt.map(nome => `
+              <div class="flex justify-between items-center bg-stone-50 border border-stone-200 p-2.5 rounded-xl text-stone-700 font-medium text-xs mb-2 transition-colors hover:border-red-200">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-user-check text-emerald-600"></i> ${nome}</span>
+                <button onclick="engatilharExclusaoLog('${nome}')" class="text-red-500 hover:text-red-700 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer" title="Retirar Auditoria">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </div>
+            `).join('');
+          } else {
+            btnExt.classList.add('hidden');
+            recorteGestorVisao.forEach(funcItem => funcItem.decisao = 'NÃO');
+            apurarValoresLote();
+            renderizarInterface();
+            painelRef.innerHTML = `<div class="text-center text-stone-400 py-6">Vazio. Nenhum processamento detectado.</div>`;
+          }
+        })
+        .withFailureHandler(acionarAlertaFalha)
+        .obterHistoricoAnteriores(gAlvo);
+    }
+
+    function engatilharExclusaoLog(nomeRemovido) {
+      alvoRemocaoTemporario = nomeRemovido;
+      document.getElementById('nomeRemocaoTexto').innerText = nomeRemovido;
+      abrirModal('modal-confirmacao');
+    }
+
+    function confirmarExclusaoLog() {
+      if(!alvoRemocaoTemporario) return;
+      const refArea = document.getElementById('seletorVisaoAlvo').value;
+      fecharModal('modal-confirmacao');
+      
+      google.script.run
+        .withSuccessHandler(function(sinal) {
+          if(sinal === "Sucesso") {
+            exibirNotificacaoToast('Operação Finalizada', `${alvoRemocaoTemporario} foi suprimido do registro matriz.`, 'sucesso');
+            mapearRegistrosPassados(refArea);
+          } else { exibirNotificacaoToast('Falha na Supressão', sinal, 'erro'); }
+        })
+        .withFailureHandler(acionarAlertaFalha)
+        .retirarRegistroAnterior(refArea, alvoRemocaoTemporario);
+    }
+
+    function processarEnvioLote() {
+      const acionador = document.getElementById('btnGravarMatriz');
+      const paramRef = document.getElementById('seletorVisaoAlvo').value;
+      acionador.disabled = true;
+      acionador.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Emitindo Instrução...`;
+
+      google.script.run
+        .withSuccessHandler(function() {
+          exibirNotificacaoToast('Arquivamento Concluído!', 'A tabela matriz absorveu as validações desta sessão.', 'sucesso');
+          acionador.innerHTML = `<i class="fa-solid fa-check-double"></i> Registrado e Fechado`;
+          acionador.classList.replace('bg-emerald-700', 'bg-emerald-600');
+          mapearRegistrosPassados(paramRef);
+          setTimeout(() => {
+            acionador.disabled = false;
+            acionador.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Registrar Validação Lote`;
+            acionador.classList.replace('bg-emerald-600', 'bg-emerald-700');
+          }, 4000);
+        })
+        .withFailureHandler(function(err) {
+          acionarAlertaFalha(err);
+          acionador.disabled = false;
+          acionador.innerHTML = `<i class="fa-solid fa-rotate-right"></i> Reconectar Envio`;
+        })
+        .arquivarRegistrosFinanceiros(recorteGestorVisao, sessaoSincronizada.identificador, paramRef, indiceCustoMatriz);
+    }
+
+    function acionarCargaAdmin() {
+      const espaco = document.getElementById('lista-admin-chaves');
+      espaco.innerHTML = `<div class="text-center py-6 text-stone-400 text-sm"><i class="fa-solid fa-circle-notch animate-spin"></i> Processando varredura global...</div>`;
+      
+      google.script.run
+        .withSuccessHandler(function(blocos) {
+          if(!blocos || blocos.length === 0) {
+            espaco.innerHTML = `<div class="text-center py-6 text-stone-400 text-sm">Base oculta vazia.</div>`;
+            return;
+          }
+          espaco.innerHTML = blocos.map(reg => `
+            <div class="flex flex-col md:flex-row justify-between md:items-center p-3 bg-stone-50 border border-stone-200 rounded-lg transition-all hover:border-indigo-200 gap-3">
+              <div>
+                <div class="font-bold text-sm text-slate-800 uppercase break-words">${reg.identificador}</div>
+                <div class="text-[11px] text-stone-500 font-mono mt-1 font-bold">PIN Autorizado: <span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200">${reg.chave}</span></div>
+              </div>
+              <div class="w-full md:w-auto text-right md:text-left">
+                <button onclick="enviarOrdemStatusAdmin('${reg.identificador}', '${reg.status === 'Ativo' ? 'Inativo' : 'Ativo'}')" class="text-[11px] font-bold px-3 py-1.5 rounded-full cursor-pointer transition-all border shadow-sm ${reg.status === 'Ativo' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'} w-full md:w-auto">
+                  ${reg.status === 'Ativo' ? '<i class="fa-solid fa-check"></i> Ativo' : '<i class="fa-solid fa-ban"></i> Bloqueado'}
+                </button>
+              </div>
+            </div>
+          `).join('');
+        })
+        .withFailureHandler(acionarAlertaFalha)
+        .coletarRelatorioChaves();
+    }
+
+    function enviarOrdemStatusAdmin(idAlvo, metaStatus) {
+      document.getElementById('lista-admin-chaves').innerHTML = `<div class="text-center py-6 text-stone-400 text-sm"><i class="fa-solid fa-circle-notch animate-spin"></i> Sincronizando bloqueio...</div>`;
+      google.script.run
+        .withSuccessHandler(function() {
+          acionarCargaAdmin();
+          exibirNotificacaoToast('Regra Aplicada', `Privilégios de ${idAlvo} alterados para ${metaStatus}.`, 'sucesso');
+        })
+        .withFailureHandler(acionarAlertaFalha)
+        .alternarStatusAcessoGestor(idAlvo, metaStatus);
+    }
+
+    function abrirModal(idTarget) { 
+      const tela = document.getElementById(idTarget);
+      tela.classList.remove('hidden'); 
+      setTimeout(() => tela.firstElementChild.classList.remove('scale-95'), 10);
+    }
+    
+    function fecharModal(idTarget) { 
+      const tela = document.getElementById(idTarget);
+      tela.firstElementChild.classList.add('scale-95');
+      setTimeout(() => tela.classList.add('hidden'), 150);
+      if(idTarget === 'modal-senha') {
+        document.getElementById('campoChaveUser').value = '';
+        document.getElementById('campoChaveAtual').value = '';
+        document.getElementById('campoNovaChave').value = '';
+      }
+    }
+
+    function solicitarModificacaoChave() {
+      const u = document.getElementById('campoChaveUser').value.trim();
+      const pAtual = document.getElementById('campoChaveAtual').value.trim();
+      const pNovo = document.getElementById('campoNovaChave').value.trim();
+      const g = document.getElementById('btnRegistrarModificacao');
+
+      if(!u || !pAtual || !pNovo) { 
+        exibirNotificacaoToast('Formulário Recusado', 'Complete todos os campos necessários.', 'erro'); 
+        return; 
+      }
+      g.disabled = true; g.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> Efetuando...`;
+
+      google.script.run
+        .withSuccessHandler(function(rep) {
+          if(rep.sucesso) {
+            exibirNotificacaoToast('Autorização Concedida!', rep.mensagem, 'sucesso');
+            fecharModal('modal-senha');
+          } else { exibirNotificacaoToast('Negado', rep.mensagem, 'erro'); }
+          g.disabled = false; g.innerHTML = `Gravar Modificação`;
+        })
+        .withFailureHandler(function(err){
+          acionarAlertaFalha(err);
+          g.disabled = false; g.innerHTML = `Gravar Modificação`;
+        })
+        .atualizarChaveExterna(u, pAtual, pNovo);
+    }
+
+    function exibirNotificacaoToast(cabecalho, corpo, classeIcone) {
+      const placa = document.getElementById('toastNotificacao');
+      const divIcon = document.getElementById('toast-icon');
+      document.getElementById('toast-title').innerText = cabecalho;
+      document.getElementById('toast-message').innerText = corpo;
+      placa.classList.remove('hidden');
+      if(classeIcone === 'sucesso') {
+        placa.className = "fixed top-6 right-6 z-[70] transition-transform duration-300 ease-out max-w-sm w-full bg-white shadow-xl rounded-xl border border-emerald-100 p-4 flex items-start gap-3 border-l-4 border-l-emerald-500";
+        divIcon.className = "w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0";
+        divIcon.innerHTML = '<i class="fa-solid fa-check"></i>';
+      } else {
+        placa.className = "fixed top-6 right-6 z-[70] transition-transform duration-300 ease-out max-w-sm w-full bg-white shadow-xl rounded-xl border border-red-100 p-4 flex items-start gap-3 border-l-4 border-l-red-500";
+        divIcon.className = "w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0";
+        divIcon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+      }
+      placa.style.transform = "translateX(0)"; setTimeout(ocultarNotificacao, 7000);
+    }
+    
+    function ocultarNotificacao() { document.getElementById('toastNotificacao').style.transform = "translateX(120%)"; }
+    
+    function acionarAlertaFalha(err) {
+      var mensagemErro = (err && err.message) ? err.message : "Desconhecido. Verifique as permissões de acesso da planilha Cofre.";
+      
+      // MENSAGEM DO TEAMS 
+      mensagemErro += " Dúvidas? Fale com Kássio Cezar pelo Teams.";
+      
+      exibirNotificacaoToast('Barreira de Servidor', mensagemErro, 'erro');
+      resetarElementoLogin();
+    }
+  </script>
+</body>
+</html>
